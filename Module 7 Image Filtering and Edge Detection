@@ -2,16 +2,6 @@ import cv2
 import os
 import sys
 
-PREVIE = 0
-BLUR = 1
-FEATURES = 2
-CANNY = 3
-
-feature_params = dict(maxCornoers = 500,
-                      qualityLevel = 0.2,
-                      minDistance = 15,
-                      blockSize = 9)
-
 s = 0
 
 if len(sys.argv) > 1:
