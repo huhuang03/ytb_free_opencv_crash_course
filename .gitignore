@@ -1,3 +1,5 @@
 .ipynb_checkpoints/
 out-*.jpg
 out-*.png
+
+goturn.caffemodel
