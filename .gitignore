@@ -8,3 +8,4 @@ out_*.png
 out_*.mp4
 
 goturn.caffemodel
+.idea/
