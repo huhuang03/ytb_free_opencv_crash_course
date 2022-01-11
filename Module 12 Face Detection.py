@@ -1,16 +1,8 @@
+import os.path
+
 import cv2
 import sys
 import numpy as np
-
-PREVIEW = 0
-BLUR = 1
-FEATURES = 2
-CANNY = 3
-
-feature_params = dict(maxCorners=500,
-                      qualityLevel=0.2,
-                      minDistance=15,
-                      blockSize=9)
 
 s = 0
 
@@ -19,44 +11,56 @@ if len(sys.argv) > 1:
 
 source = cv2.VideoCapture(s)
 
+deploy_path = 'deploy.prototxt'
+model_path = 'res10_300x300_ssd_iter_140000_fp16.caffemodel'
+
+assert os.path.isfile(deploy_path)
+assert os.path.isfile(model_path)
+
+net = cv2.dnn.readNetFromCaffe(deploy_path, model_path)
+
+in_width = 300
+in_height = 300
+mean = [104, 117, 123]
+conf_threshold = 0.7
+
+
 win_name = 'Camera Preview'
 cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
 
-alive = True
-image_filter = PREVIEW
 
-while alive:
+while cv2.waitKey(1) != 27:
     has_frame, frame = source.read()
     if not has_frame:
         break
 
-    if image_filter == PREVIEW:
-        result = frame
-    elif image_filter == CANNY:
-        result = cv2.Canny(frame, 145, 150)
-    elif image_filter == BLUR:
-        result = cv2.blur(frame, (13, 13))
-    elif image_filter == FEATURES:
-        result = frame
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        corners = cv2.goodFeaturesToTrack(frame_gray, **feature_params)
-        if corners is not None:
-            for x, y in np.int32(corners).reshape(-1, 2):
-                print(x, y)
-                cv2.circle(result, (x, y), 10, (0, 255, 0), 1)
+    frame_height, frame_width, _ = frame.shape
 
-    cv2.imshow(win_name, result)
-    key = cv2.waitKey(1)
-    if key == ord('Q') or key == ord('q') or key == 27:
-        alive = False
-    elif key == ord('C') or key == ord('c'):
-        image_filter = CANNY
-    elif key == ord('B') or key == ord('b'):
-        image_filter = BLUR
-    elif key == ord('F') or key == ord('f'):
-        image_filter = FEATURES
-    elif key == ord('P') or key == ord('p'):
-        image_filter = PREVIEW
+    blob = cv2.dnn.blobFromImage(frame, 1.0, (in_width, in_height), mean, swapRB=False, crop=False)
+    net.setInput(blob)
+    detections = net.forward()
+
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > conf_threshold:
+            x_left_bottom = int(detections[0, 0, i, 3] * frame_width)
+            y_left_bottom = int(detections[0, 0, i, 4] * frame_width)
+            x_right_top = int(detections[0, 0, i, 5] * frame_width)
+            y_right_top = int(detections[0, 0, i, 6] * frame_width)
+
+            cv2.rectangle(frame, (x_left_bottom, y_left_bottom),
+                          (x_right_top, y_right_top), (0, 255, 0))
+            label = "Confidence: %.4f" % confidence
+            label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(frame, (x_left_bottom, y_left_bottom - label_size[1]),
+                          (x_left_bottom + label_size[0], y_left_bottom + base_line),
+                          (255, 255, 255), cv2.FILLED)
+            cv2.putText(frame, label, (x_left_bottom, y_left_bottom),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0))
+        t, _ = net.getPerfProfile()
+        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
+        cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        cv2.imshow(win_name, frame)
 
 source.release()
 cv2.destroyWindow(win_name)
