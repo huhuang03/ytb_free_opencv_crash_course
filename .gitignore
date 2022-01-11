@@ -1,5 +1,10 @@
 .ipynb_checkpoints/
 out-*.jpg
 out-*.png
+out-*.mp4
+
+out_*.jpg
+out_*.png
+out_*.mp4
 
 goturn.caffemodel
